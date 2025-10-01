@@ -1,0 +1,38 @@
+#!/bin/bash
+
+# Kontrollime, kas skriptile anti parameeter (failinimi)
+if [ -z "$1" ]; then
+    echo "Kasutus: $0 <kasutajate_failinimi>"
+    exit 1
+fi
+
+KASUTAJATE_FAIL="$1"
+LISA_SKRIPT="./lisa_kasutaja"
+
+# Kontrollime, kas sisendfail on olemas
+if [ ! -f "$KASUTAJATE_FAIL" ]; then
+    echo "Viga: Faili '$KASUTAJATE_FAIL' ei leitud."
+    exit 1
+fi
+
+# Kontrollime, kas lisa_kasutaja skript on olemas ja käivitatav
+if [ ! -x "$LISA_SKRIPT" ]; then
+    echo "Viga: Skripti '$LISA_SKRIPT' ei leitud või see pole käivitatav. Palun kontrolli õigusi."
+    exit 1
+fi
+
+echo "Alustatakse kasutajate loomist failist '$KASUTAJATE_FAIL'..."
+
+# Loeme faili rida-realt
+while IFS= read -r KASUTAJANIMI; do
+    # Eemaldame tühikud rea algusest ja lõpust (vajalik hea praktika)
+    KASUTAJANIMI=$(echo "$KASUTAJANIMI" | xargs)
+
+    if [ ! -z "$KASUTAJANIMI" ]; then
+        echo "--> Loob kasutaja: $KASUTAJANIMI"
+        # Kutsume välja eelmise ülesande skripti
+        "$LISA_SKRIPT" "$KASUTAJANIMI"
+    fi
+done < "$KASUTAJATE_FAIL"
+
+echo "Kasutajate loomine lõpetatud."
