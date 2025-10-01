@@ -1,0 +1,34 @@
+#!/bin/bash
+
+# Kontrollime, kas skriptile anti parameeter (kasutajanimi)
+if [ -z "$1" ]; then
+    echo "Kasutus: $0 <kasutajanimi>"
+    exit 1
+fi
+
+KASUTAJANIMI="$1"
+
+# Käsk kasutaja loomiseks (useradd):
+# -m: loob kodukataloogi (vajalik struktuur tekib vaikimisi)
+# -s /sbin/nologin: hoiab ära paroolita sisselogimise (valikuline, aga hea tava)
+# -G users: lisame kasutaja tavalisse 'users' gruppi (valikuline)
+# Kontrollime, kas kodukataloog tekib kataloogi /home/kasutajanimi
+# useradd loob kodukataloogi koos peidetud failidega (nt .bashrc, .profile) vaikimisi.
+useradd -m "$KASUTAJANIMI"
+
+if [ $? -eq 0 ]; then
+    echo "Kasutaja $KASUTAJANIMI loodi edukalt."
+
+    # Seadistame parooli (lukustame konto, et paroolita ei saaks sisse logida)
+    # -L: Lukusta parool
+    passwd -l "$KASUTAJANIMI" > /dev/null 2>&1
+
+    # Kontroll: Näita sissekandeid /etc/passwd ja /etc/shadow failides
+    echo "--- Kontroll ---"
+    grep "$KASUTAJANIMI" /etc/passwd
+    grep "$KASUTAJANIMI" /etc/shadow
+    echo "Kodukataloogi sisu (/home/$KASUTAJANIMI):"
+    ls -a "/home/$KASUTAJANIMI"
+else
+    echo "Viga: Kasutaja $KASUTAJANIMI loomine ebaõnnestus."
+fi
