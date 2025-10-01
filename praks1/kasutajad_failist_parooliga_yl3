@@ -1,0 +1,49 @@
+#!/bin/bash
+
+# Kontrollime parameetrit
+if [ -z "$1" ]; then
+    echo "Kasutus: $0 <kasutajate_paroolide_failinimi>"
+    exit 1
+fi
+
+PAROOLIDE_FAIL="$1"
+
+if [ ! -f "$PAROOLIDE_FAIL" ]; then
+    echo "Viga: Faili '$PAROOLIDE_FAIL' ei leitud."
+    exit 1
+fi
+
+echo "Alustatakse kasutajate loomist ja paroolide määramist failist '$PAROOLIDE_FAIL'..."
+
+# Loeme faili rida-realt
+while IFS= read -r rida; do
+    # Eraldame kasutajanime ja parooli kooloni järgi
+    KASUTAJANIMI=$(echo "$rida" | cut -d ':' -f 1 | xargs)
+    PAROOL=$(echo "$rida" | cut -d ':' -f 2 | xargs)
+
+    if [ -z "$KASUTAJANIMI" ] || [ -z "$PAROOL" ]; then
+        echo "Hoiatus: Rida '$rida' on vigane, jäetakse vahele."
+        continue
+    fi
+
+    echo "--> Loob kasutaja: $KASUTAJANIMI ja määrab parooli..."
+
+    # 1. Kasutaja loomine (nagu Ülesanne 1)
+    # -p: lukustab konto, kuni parool on määratud (valikuline, aga parem kui paroolita jätta)
+    useradd -m "$KASUTAJANIMI" > /dev/null 2>&1
+
+    if [ $? -eq 0 ]; then
+        # 2. Parooli määramine (chpasswd on massoperatsioonide jaoks efektiivsem)
+        # chpasswd loeb kujul KASUTAJANIMI:PAROOL sisendit ja määrab parooli.
+        echo "$KASUTAJANIMI:$PAROOL" | chpasswd
+
+        echo "Kasutaja $KASUTAJANIMI loodi ja parool määrati edukalt."
+
+        # Kontroll (lisa /etc/shadow sissekanne)
+        grep "$KASUTAJANIMI" /etc/shadow
+    else
+        echo "Viga: Kasutaja $KASUTAJANIMI loomine ebaõnnestus (võib juba eksisteerida)."
+    fi
+done < "$PAROOLIDE_FAIL"
+
+echo "Töö lõpetatud."
