@@ -1,0 +1,49 @@
+#!/bin/bash
+
+# Kontrollime parameetreid
+if [ "$#" -ne 2 ]; then
+    echo "Kasutus: $0 <kasutajate_failinimi> <paroolide_failinimi>"
+    exit 1
+fi
+
+KASUTAJATE_FAIL="$1"
+PAROOLIDE_FAIL="$2"
+
+if [ ! -f "$KASUTAJATE_FAIL" ] || [ ! -f "$PAROOLIDE_FAIL" ]; then
+    echo "Viga: Mõlemad failid peavad olema olemas."
+    exit 1
+fi
+
+echo "Alustatakse kasutajate loomist failidest '$KASUTAJATE_FAIL' ja '$PAROOLIDE_FAIL'..."
+
+# Loe kasutajate fail ja paroolide fail samaaegselt
+# IFS määrab, kuidas lugeda faile, read -r hoiab ära tagasikäikude (backslash) tõlgendamise.
+paste "$KASUTAJATE_FAIL" "$PAROOLIDE_FAIL" | while IFS=$'\t' read -r KASUTAJANIMI PAROOL; do
+    
+    # Eemaldame tühikud
+    KASUTAJANIMI=$(echo "$KASUTAJANIMI" | xargs)
+    PAROOL=$(echo "$PAROOL" | xargs)
+
+    if [ -z "$KASUTAJANIMI" ] || [ -z "$PAROOL" ]; then
+        echo "Hoiatus: Tühjad read/paroolid vahele jäetud."
+        continue
+    fi
+
+    echo "--> Loob kasutaja: $KASUTAJANIMI ja määrab parooli..."
+
+    # 1. Kasutaja loomine
+    useradd -m "$KASUTAJANIMI" > /dev/null 2>&1
+
+    if [ $? -eq 0 ]; then
+        # 2. Parooli määramine
+        echo "$KASUTAJANIMI:$PAROOL" | chpasswd
+
+        echo "Kasutaja $KASUTAJANIMI loodi ja parool määrati edukalt."
+        grep "$KASUTAJANIMI" /etc/shadow
+    else
+        echo "Viga: Kasutaja $KASUTAJANIMI loomine ebaõnnestus."
+    fi
+
+done
+
+echo "Töö lõpetatud."
