@@ -1,0 +1,78 @@
+#!/bin/bash
+
+# 1. ÕIGUSTE KONTROLL
+# Skript peab töötama ainult OSTSESE root-kasutajana ('su -')
+# ja keelduma, kui seda käivitatakse tavakasutaja poolt 'sudo' abil.
+
+# Kontroll 1: Kas käivitatud root-õigustes (EUID = 0)?
+if [ "$(id -u)" -ne 0 ]; then
+    echo "Viga: Skript tuleb käivitada root-õigustes (sudo või su -)."
+    exit 1
+fi
+
+# Kontroll 2: Kas käivitati 'sudo' abil? (SUDO_USER muutuja on seatud)
+# See tingimus eristab otsese root-kasutaja ja 'sudo' kasutaja.
+if [ -n "$SUDO_USER" ]; then
+    echo "Viga: SUDO kasutamine on keelatud! Palun logige sisse otse 'su -' abil."
+    exit 1
+fi
+
+# ------------------------------------
+# 2. PARAMEETRITE KONTROLL
+# ------------------------------------
+
+# Kontrolli, kas parameetrina anti failinimi
+if [ -z "$1" ]; then
+    echo "Kasutus: $0 <kasutajate_failinimi>"
+    exit 1
+fi
+
+KASUTAJATE_FAIL="$1"
+LOGI_FAIL="loodud_kasutajad_paroolidega.log"
+
+if [ ! -f "$KASUTAJATE_FAIL" ]; then
+    echo "Viga: Faili '$KASUTAJATE_FAIL' ei leitud."
+    exit 1
+fi
+
+# Kontrolli, kas pwgen on paigaldatud (vajalik paroolide genereerimiseks)
+if ! command -v pwgen &> /dev/null; then
+    echo "Viga: Käsku 'pwgen' ei leitud. Palun paigalda see (nt. apt install pwgen)."
+    exit 1
+fi
+
+# ------------------------------------
+# 3. KASUTAJATE LOOMISE LOOGIKA
+# ------------------------------------
+
+echo "Alustatakse kasutajate loomist ja paroolide genereerimist..."
+# Tühjenda logifail enne uue töö alustamist
+> "$LOGI_FAIL"
+
+# Loeme faili rida-realt
+while IFS= read -r KASUTAJANIMI; do
+    KASUTAJANIMI=$(echo "$KASUTAJANIMI" | xargs)
+
+    if [ ! -z "$KASUTAJANIMI" ]; then
+
+        # 1. Genereeri parool (8 sümbolit, alfanumeeriline)
+        PAROOL=$(pwgen -s -1 8)
+
+        # 2. Kasutaja loomine (-m: loo kodukataloog)
+        useradd -m "$KASUTAJANIMI" > /dev/null 2>&1
+
+        if [ $? -eq 0 ]; then
+            # 3. Parooli määramine (chpasswd)
+            echo "$KASUTAJANIMI:$PAROOL" | chpasswd
+
+            # 4. Logimine
+            echo "$KASUTAJANIMI:$PAROOL" >> "$LOGI_FAIL"
+
+            echo "Kasutaja $KASUTAJANIMI loodi ja logiti."
+        else
+            echo "Hoiatus: Kasutaja $KASUTAJANIMI loomine ebaõnnestus (võib juba eksisteerida)."
+        fi
+    fi
+done < "$KASUTAJATE_FAIL"
+
+echo "Töö lõpetatud. Kontrolli '$LOGI_FAIL'."
