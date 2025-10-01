@@ -1,0 +1,57 @@
+#!/bin/bash
+
+# Kontrollime parameetrit
+if [ -z "$1" ]; then
+    echo "Kasutus: $0 <kasutajate_failinimi>"
+    exit 1
+fi
+
+KASUTAJATE_FAIL="$1"
+LOGI_FAIL="loodud_kasutajad_paroolidega.log"
+
+if [ ! -f "$KASUTAJATE_FAIL" ]; then
+    echo "Viga: Faili '$KASUTAJATE_FAIL' ei leitud."
+    exit 1
+fi
+
+# Kontrolli, kas pwgen on paigaldatud
+if ! command -v pwgen &> /dev/null; then
+    echo "Viga: Käsku 'pwgen' ei leitud. Palun paigalda see (nt. apt install pwgen)."
+    exit 1
+fi
+
+echo "Alustatakse kasutajate loomist ja paroolide genereerimist failist '$KASUTAJATE_FAIL'..."
+
+# Eemaldame vanad logid
+> "$LOGI_FAIL"
+
+# Loeme faili rida-realt
+while IFS= read -r KASUTAJANIMI; do
+    KASUTAJANIMI=$(echo "$KASUTAJANIMI" | xargs)
+
+    if [ ! -z "$KASUTAJANIMI" ]; then
+        
+        # Genereerime 8 sümboli pikkuse, ainult alfanumeerilise parooli (ilma spetsiaalsete sümboliteta)
+        PAROOL=$(pwgen -s -1 8)
+
+        echo "--> Loob kasutaja: $KASUTAJANIMI, parool on genereeritud."
+
+        # 1. Kasutaja loomine
+        useradd -m "$KASUTAJANIMI" > /dev/null 2>&1
+
+        if [ $? -eq 0 ]; then
+            # 2. Parooli määramine
+            echo "$KASUTAJANIMI:$PAROOL" | chpasswd
+
+            # 3. Logimine
+            echo "$KASUTAJANIMI:$PAROOL" >> "$LOGI_FAIL"
+
+            echo "Kasutaja $KASUTAJANIMI loodi ja logiti. Parooli räsi /etc/shadow'is:"
+            grep "$KASUTAJANIMI" /etc/shadow
+        else
+            echo "Viga: Kasutaja $KASUTAJANIMI loomine ebaõnnestus (võib juba eksisteerida)."
+        fi
+    fi
+done < "$KASUTAJATE_FAIL"
+
+echo "Töö lõpetatud. Loodud kasutajad ja paroolid logiti faili '$LOGI_FAIL'."
